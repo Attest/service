@@ -15,5 +15,17 @@ func (g Group) Readiness() http.HandlerFunc {
 		if !g.started() || !g.setup() {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
+
+		g.processLock.RLock()
+		defer g.processLock.RUnlock()
+
+		for i := range g.processes {
+			r := g.processes[i]
+
+			if !r.Healthy() {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+		}
 	}
 }

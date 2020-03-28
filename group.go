@@ -3,11 +3,20 @@ package service
 import (
 	"context"
 	"os"
+	"sync"
 
 	"golang.org/x/sync/errgroup"
 )
 
+type Runner interface {
+	Run(ctx context.Context) error
+	Healthy() bool
+}
+
 type runFn func(ctx context.Context) error
+
+func (f runFn) Run(ctx context.Context) error { return f(ctx) }
+func (f runFn) Healthy() bool                 { return true }
 
 type Group struct {
 	rootCtx    context.Context
@@ -15,8 +24,9 @@ type Group struct {
 	startedCh  chan struct{}
 	setupCh    chan struct{}
 
-	setups    []runFn
-	processes []runFn
+	setups      []runFn
+	processes   []Runner
+	processLock *sync.RWMutex
 }
 
 func NewSignals(sig ...os.Signal) *Group {
@@ -29,8 +39,9 @@ func NewCtx(ctx context.Context) *Group {
 		rootCtx:    ctx,
 		rootCancel: cancel,
 
-		startedCh: make(chan struct{}),
-		setupCh:   make(chan struct{}),
+		startedCh:   make(chan struct{}),
+		setupCh:     make(chan struct{}),
+		processLock: &sync.RWMutex{},
 	}
 }
 
@@ -39,7 +50,26 @@ func (g *Group) Setup(fn func(ctx context.Context) error) {
 }
 
 func (g *Group) Register(fn func(ctx context.Context) error) {
-	g.processes = append(g.processes, fn)
+	g.register(runFn(fn))
+}
+
+func (g *Group) RegisterRunner(r Runner) {
+	g.register(r)
+}
+
+func (g *Group) register(r Runner) {
+	if g.started() {
+		panic("group is started, cannot add runner")
+	}
+
+	if r == nil {
+		return
+	}
+
+	g.processLock.Lock()
+	defer g.processLock.Unlock()
+
+	g.processes = append(g.processes, r)
 }
 
 func (g *Group) Start() error {
@@ -62,10 +92,10 @@ func (g *Group) Start() error {
 	errGrp, ctx := errgroup.WithContext(g.rootCtx)
 
 	for i := range g.processes {
-		fn := g.processes[i]
+		r := g.processes[i]
 
 		errGrp.Go(func() error {
-			return fn(ctx)
+			return r.Run(ctx)
 		})
 	}
 
