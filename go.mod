@@ -1,4 +1,4 @@
-module github.com/zknill/service
+module github.com/Attest/service
 
 go 1.13
 
