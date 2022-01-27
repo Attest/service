@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zknill/service"
+	"github.com/Attest/service"
 )
 
 func TestProbes(t *testing.T) {

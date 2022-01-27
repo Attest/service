@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zknill/service"
+	"github.com/Attest/service"
 )
 
 func TestGroup(t *testing.T) {

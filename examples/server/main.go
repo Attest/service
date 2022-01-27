@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/zknill/service"
+	"github.com/Attest/service"
 )
 
 func main() {
